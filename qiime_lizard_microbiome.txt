@@ -1,0 +1,530 @@
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path Microbiology \
+  --input-format CasavaOneEightSingleLanePerSampleDirFmt \
+  --output-path FINAL.qza
+
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path Microbiology \
+  --input-format CasavaOneEightSingleLanePerSampleDirFmt \
+  --output-path demuxpaired.qza
+
+__________________________________
+
+DEMULTIPLEX DATA
+
+qiime demux summarize \
+  --i-data FINAL.qza \
+  --o-visualization tanmayi.qzv
+
+qiime demux summarize \
+  --i-data demuxpaired.qza \
+  --o-visualization demuxpaired.qzv
+
+_________________________________
+
+DENOISE - SINGLE 
+
+qiime dada2 denoise-single \
+  --i-demultiplexed-seqs FINAL.qza \
+  --p-trim-left 13 \
+  --p-trunc-len 151 \
+  --o-representative-sequences sequences.qza \
+  --o-table table.qza \
+  --o-denoising-stats stats.qza
+
+qiime dada2 denoise-single \
+  --i-demultiplexed-seqs demuxpaired.qza \
+  --p-trim-left 13 \
+  --p-trunc-len 151 \
+  --o-representative-sequences sequences2.qza \
+  --o-table table2.qza \
+  --o-denoising-stats stats2.qza
+
+DENOISE 
+**********never ran
+qiime dada2 denoise-paired \ 
+--i-demultiplexed-seqs demuxpaired.qza \ 
+--p-trunc-len-f 151 \
+ --p-trim-left-f 13 \ 
+--p-trunc-len-r 151 \ 
+--p-trim-left-r 0 \
+--o-representative-sequences sequencespaired.qza \ 
+--o-table tablepaired.qza \ 
+--o-denoising-stats statspaired.qza
+
+
+VIEWING A DENOISE SUMMARY
+
+qiime metadata tabulate \
+  --m-input-file stats.qza \
+  --o-visualization stats.qzv
+
+VIEWING ASV sequences 
+
+qiime feature-table tabulate-seqs \
+  --i-data sequences.qza \
+  --o-visualization sequences.qzv
+
+VIEWING the ASV table summary
+
+ qiime feature-table summarize \
+  --i-table table.qza \
+  --m-sample-metadata-file metadata.tsv \
+  --o-visualization table.qzv
+
+Computing community richness at different depths of sequencing 
+RAREIFICATION
+
+qiime diversity alpha-rarefaction \
+  --i-table table.qza \
+  --p-max-depth 60000 \    #literature recommended something near the 3rd quartile of frequency 
+  --m-metadata-file metadata.tsv \
+  --o-visualization alpha.qzv
+
+Rarefies the ASV table — 
+
+QUESTION: How to determine sequencing depth: I tried a couple to maximize samples for each type of analysis 
+
+(7000) --- Maximizes included samples for island 
+qiime feature-table rarefy \
+  --i-table table.qza \
+  --p-sampling-depth 7000\
+  --o-rarefied-table asv-table-7000.qza
+
+(30000) --- Provides most equal samples per island 
+qiime feature-table rarefy \
+  --i-table table.qza \
+  --p-sampling-depth 30000 \
+  --o-rarefied-table asv-table-30000.qza
+
+
+[ALPHA] Shannon Diversity 
+
+(7000) --- Maximizes included samples for island 
+qiime diversity alpha \
+  --i-table asv-table-7000.qza \
+  --p-metric shannon \
+  --o-alpha-diversity shannon-7000.qza
+
+(30000) --- Provides most equal samples per island 
+qiime diversity alpha \
+  --i-table asv-table-30000.qza \
+  --p-metric shannon \
+  --o-alpha-diversity shannon-30000.qza
+
+[ALPHA] #ASV
+
+(7000) --- Maximizes included samples for island 
+qiime diversity alpha \
+  --i-table asv-table-7000.qza \
+  --p-metric observed_features \
+  --o-alpha-diversity observed_features-7000.qza
+
+(30000) --- Provides most equal samples per island 
+qiime diversity alpha \
+  --i-table asv-table-30000.qza \
+  --p-metric observed_features \
+  --o-alpha-diversity observed_features-30000.qza
+
+
+Kruskal-Wallis test on the Observed Features values 
+
+SHANNON DIVERSITY 
+(7000) --- Maximizes included samples for island 
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity shannon-7000.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization shannon-7000.qzv
+
+(30000) --- Provides most equal samples per island 
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity shannon-30000.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization shannon-30000.qzv
+
+# ASV 
+
+(7000) --- Maximizes included samples for island 
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity observed_features-7000.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization observed_features-7000.qzv
+
+(30000) --- Provides most equal samples per island 
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity observed_features-30000.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization observed_features-30000.qzv
+_____________________________________________ END OF QIIME 
+
+BLAST SEARCH *****Didn’t end up doing 
+Our query was too large and it exceeded the capacity for BLAST web server 
+First, I went to our sequences.qvz download that visualized the various unique ASVs
+Then, I downloaded that as a sequences.FASTA file (compatible with BLAST)
+ Downloaded a stand alone software to load queries offline in batches (from NCBI website) 
+				ncbi-blast-#.#.#+-x64-maxosx.tar.gz (ncbi-blast-2.13.0+-x64-macosx.tar.gz)
+
+
+cd ncbi-blast-2.13.0+
+cd blast/
+tar -zxf sequences.fasta
+
+_____________________________________
+
+https://cryptick-lab.github.io/NGS-Analysis/_site/QIIME2-Taxonomy.html
+
+https://joey711.github.io/phyloseq/import-data.html
+
+https://otagoedna.github.io/getting_started_with_qiime2/taxonomy_assignment/Exploring_Taxonomy_Assignment.html
+
+https://bioinfo.ird.fr/index.php/tutorials-fr/qiime2-in-command-line/
+
+
+
+
+
+
+
+__________________________________________
+
+REAL CODE: 13.8 
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier gg-13-8-99-515-806-nb-classifier.qza \
+  --i-reads sequences2.qza \
+  --o-classification taxonomy13.8.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy13.8.qza \
+  --o-visualization taxonomy13.8.qzv
+
+qiime taxa filter-table \
+  --i-table table2.qza \
+  --i-taxonomy taxonomy13.8.qza \
+  --p-exclude mitochondria,chloroplast \
+  --o-filtered-table 16S-table-noplant13.8.qza
+
+qiime feature-table rarefy \
+  --i-table 16S-table-noplant13.8.qza \
+  --p-sampling-depth 7000 \
+  --o-rarefied-table 16S-table-noplant-rarefied-700013.8.qza
+
+qiime taxa barplot \
+--i-table table3.qza \
+--i-taxonomy taxonomy13.8.qza \
+--m-metadata-file metadata3.tsv \
+--o-visualization taxa-bar-plots138.qzv
+
+
+**** never ran
+qiime feature-table filter-features \
+  --i-table 16S-table-noplant-rarefied-700013.8.qza \
+  --p-min-samples 2 \
+  --o-filtered-table 16S-table-noplant-rarefied-7000_filtered13.8.qza
+
+______________________________________________________________
+
+Real code - Greengenes 2
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier 2022.10.backbone.v4.nb.qza \
+  --i-reads sequences2.qza \
+  --o-classification taxonomy2.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy2.qza \
+  --o-visualization taxonomy2.qzv
+
+
+qiime taxa barplot \
+--i-table table2.qza \
+--i-taxonomy taxonomy2.qza \
+--m-metadata-file metadata2.tsv \
+--o-visualization taxa-bar-plots2.qzv
+
+
+FILTERING TABLE
+
+Remove Mit and Chlor
+qiime taxa filter-table \
+  --i-table table2.qza \
+  --i-taxonomy taxonomy2.qza \
+  --p-exclude mitochondria,chloroplast \
+  --o-filtered-table 16S-table-noplant2.qza
+
+qiime taxa filter-table \
+  --i-table 16S-table.qza \
+  --i-taxonomy 16S-rep-seqs-taxonomy.qza \
+  --p-exclude mitochondria,chloroplast \
+  --o-filtered-table 16S-table-noplant.qza
+
+
+
+
+
+Remove archaea 
+
+qiime taxa filter-table \
+--i-table fin16S-table-noplant2.qza \
+--i-taxonomy taxonomy2.qza \
+--p-exclude "k__Archaea" \
+--o-filtered-table fintable-with-phyla-no-mitochondria-chloroplasts-archaea.qza
+
+Filter Eukaryotes 
+
+qiime taxa filter-table \
+--i-table fintable-with-phyla-no-mitochondria-chloroplasts-archaea.qza \
+--i-taxonomy taxonomy2.qza \
+--p-exclude "k__Eukaryota" \
+--o-filtered-table fintable-with-phyla-no-mitochondria-chloroplasts-archaea-eukaryota.qza
+
+RENAME: fintable-with-phyla-no-mitochondria-chloroplasts-archaea-eukaryota.qza —> final-fil-table.qza
+
+Filter Sequences 
+
+Remove Mitochondria or Chloroplasts
+
+qiime taxa filter-seqs \
+--i-sequences sequences2.qza \
+--i-taxonomy taxonomy2.qza \
+--p-exclude mitochondria,chloroplast \
+--o-filtered-sequences finrep-seqs-with-phyla-no-mitochondria-chloroplast.qza
+
+Remove Archaea 
+
+qiime taxa filter-seqs \
+--i-sequences finrep-seqs-with-phyla-no-mitochondria-chloroplast.qza \
+--i-taxonomy taxonomy2.qza \
+--p-exclude "k__Archaea" \
+--o-filtered-sequences finrep-seqs-with-phyla-no-mitochondria-chloroplasts-archaea.qza
+
+Remove Eukaryota
+
+qiime taxa filter-seqs \
+--i-sequences finrep-seqs-with-phyla-no-mitochondria-chloroplasts-archaea.qza \
+--i-taxonomy taxonomy2.qza \
+--p-exclude "k__Eukaryota" \
+--o-filtered-sequences final-fil-sequences.qza
+
+Build a Tree 
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences final-fil-sequences.qza \
+  --o-alignment ali-final-fil-sequences.qza \
+  --o-masked-alignment mask-ali-final-fil-sequences.qza \
+  --o-tree unrooted.qza \
+  --o-rooted-tree rooted.qza
+
+_______________________________________________________________________________________
+ ALPHA - CORE 
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted.qza \
+  --i-table final-fil-table.qza \
+  --p-sampling-depth 7000 \
+  --m-metadata-file metadata2.tsv \
+  --output-dir diversity-metrics-results
+
+
+EXPORT - BIOM FILE
+
+qiime tools export \
+  --input-path table2.qza \
+  --output-path exported-feature-table
+
+qiime tools export \
+--input-path taxonomy2.qza \
+--output-path exported
+
+qiime tools export \
+  --input-path unrooted-16S-tree-filteredSVs2.qza \
+  --output-path exported-tree
+
+mkdir extracted-feature-table
+qiime tools extract \
+  --input-path table2.qza \
+  --output-path extracted-feature-table
+
+biom convert 
+qiime tools extract \
+  --input-path feature-table.biom \
+  --output-table.tsv
+
+qiime taxa collapse --i-table table2.qza --i-taxonomy taxonomy2.qza --p-level 6 --output-dir taxtable
+
+biom add-metadata --input-fp feature-table.biom --output-fp table-with-taxonomy.biom --observation-metadata-fp biom-taxonomy.csv --sc-separated taxonomy
+
+
+https://cryptick-lab.github.io/NGS-Analysis/_site/QIIME2-Taxonomy.html
+https://docs.qiime2.org/2023.2/tutorials/moving-pictures/index.html
+https://docs.qiime2.org/2023.2/data-resources/#taxonomy-classifiers-for-use-with-q2-feature-classifier
+https://docs.qiime2.org/2020.11/data-resources/
+https://benjjneb.github.io/dada2/tutorial.html
+https://bioinfo.ird.fr/index.php/tutorials-fr/qiime2-in-command-line/
+https://docs.qiime2.org/2023.2/
+https://cryptick-lab.github.io/NGS-Analysis/_site/QIIME2-Taxonomy.html
+
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-16S-tree-filteredSVs2.qza \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --p-sampling-depth 7000 \
+  --m-metadata-file metadata2.tsv \
+  --output-dir core-metrics
+
+
+
+
+NEW TREE GENERATION
+
+Never Did 
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences sequences2.qza \
+  --o-alignment alignedsequences2.qza \
+  --o-masked-alignment maskedalignedsequences2.qza \
+  --o-tree unrooted.qza \
+  --o-rooted-tree rooted.qza
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-16S-tree-filteredSVs2.qza \
+  --i-table final-fil-table.qza \
+  --p-sampling-depth 7000 \
+  --m-metadata-file metadata2.tsv \
+  --output-dir diversity-metrics-results
+
+
+
+
+
+
+
+qiime feature-table rarefy \
+  --i-table 16S-table-noplant2.qza \
+  --p-sampling-depth 7000 \
+  --o-rarefied-table 16S-table-noplant-rarefied-70002.qza
+
+qiime feature-table filter-features \
+
+  --i-table 16S-table-noplant-rarefied-70002.qza \
+  --p-min-samples 2 \
+  --o-filtered-table 16S-table-noplant-rarefied-7000_filtered2.qza
+
+ qiime feature-table filter-seqs \
+  --i-data sequences2.qza \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --o-filtered-data sequences-filtered2.qza
+
+Visualize Table 
+ qiime feature-table summarize \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --o-visualization 16S-table-noplant-rarefied-7000_filtered2.qzv \
+  --m-sample-metadata-file metadata2.tsv
+
+
+
+
+
+4/7/2023
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-16S-tree-filteredSVs2.qza \
+  --i-table final-fil-table.qza \
+  --p-sampling-depth 7000 \
+  --m-metadata-file metadata2.tsv \
+  --output-dir diversity-metrics-results
+
+
+4/18
+
+BRAY CURTIS ~ rarified 7000
+qiime diversity beta \
+  --i-table  asv-table-7000.qza \
+ --p-metric braycurtis \
+ --o-distance-matrix pcoamatrix7000.qza
+
+qiime tools export \
+--input-path pcoamatrix7000.qza \
+--output-path bray-curtis-for-R
+
+#distance-matrix.tsv
+
+qiime diversity beta-phylogenetic \
+  --i-table table.qza \
+  --i-phylogeny rooted-tree.qza \
+ --p-metric unweighted_unifrac \
+ --o-distance-matrix unweighted_unifrac_distance_matrix.qza
+
+BRAY CURTIS 
+qiime diversity beta \
+  --i-table  table2.qza \
+ --p-metric braycurtis \
+ --o-distance-matrix braycurtis.qza
+
+JACCARD ~ rarified 7000
+
+qiime diversity beta \
+  --i-table  asv-table-7000.qza \
+ --p-metric jaccard \
+ --o-distance-matrix jaccard7000.qza
+
+qiime tools export \
+--input-path jaccard7000.qza \
+--output-path bray-curtis-for-R
+
+
+UNWEIGHTED ~ rarified 7000
+
+qiime diversity beta \
+  --i-table  asv-table-7000.qza \
+ --p-metric euclidean \
+ --o-distance-matrix euclidean7000.qza
+
+qiime tools export \
+--input-path euclidean7000.qza \
+--output-path  euclidean7000.qza-for-R
+
+
+R
+qiime diversity alpha-phylogenetic \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --i-phylogeny rooted-16S-tree-filteredSVs2.qza \
+  --p-metric faith_pd \
+  --o-alpha-diversity faith_pd_vector.qza
+
+
+
+16S-table-noplant-rarefied-7000_filtered2 —> rooted-16S-tree-filteredSVs2.qza
+
+
+qiime diversity beta-phylogenetic \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --i-phylogeny rooted-16S-tree-filteredSVs2.qza \
+ --p-metric unweighted_unifrac \
+ --o-distance-matrix unweighted_unifrac_distance_matrix.qza
+
+qiime tools export \
+--input-path unweighted_unifrac_distance_matrix.qza \
+--output-path unweighted_unifrac_distance_matrix-for-R
+
+
+Differential Analysis 
+
+qiime aldex2 aldex2 \
+	--i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+	--m-metadata-file metadata2.tsv \
+	--p-condition subject \
+	--output-dir diff-file-micro
+
+4/24
+
+qiime diversity alpha \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --p-metric simpson \
+  --o-alpha-diversity simpson7000.qza
+
+qiime diversity alpha \
+  --i-table 16S-table-noplant-rarefied-7000_filtered2.qza \
+  --p-metric chao1 \
+  --o-alpha-diversity chao7000.qza
+
