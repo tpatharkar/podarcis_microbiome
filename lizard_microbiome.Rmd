@@ -1,0 +1,1395 @@
+---
+title: "Lizard Microbiome"
+author: "Tanmayi Patharkar"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+if (!requireNamespace("devtools", quietly = TRUE)){install.packages("devtools")}
+devtools::install_github("jbisanz/qiime2R") # current version is 0.99.20rm(list = ls())
+library(phyloseq); packageVersion("phyloseq")
+library(ggplot2); packageVersion("ggplot2")
+
+setRepositories() #enter 1 2 3 4 5
+
+library(biomformat)
+library(ape)
+library(readxl)
+library(ggthemes)
+library(tidyverse)
+library(reshape)
+library(gplots)
+library(RColorBrewer)
+library(pheatmap)
+library(gridExtra)
+library(qiime2R)
+library(nlme)
+library(patchwork) #for multiplot figures
+library(Biostrings)
+library(rstatix)
+```
+```{r}
+metadata <- read_tsv('metadata2.tsv')
+metadata<- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+metadata <- metadata %>% arrange(id)
+meta_unfiltered <- read_tsv("metadata2.tsv")
+```
+
+```{r}
+# Load packages into session, and print package version
+#sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
+set.seed(100)
+sessionInfo()
+My_Theme = theme(axis.title.x = element_text(size = 13), axis.title.y = element_text(size = 13), axis.text.x = element_text(size = 10), axis.text.y = element_text(size = 10))
+```
+
+```{r}
+#this helps create a consistent and clean layout for figures with text sizes that are suitable for publication
+theme_set(theme_classic(base_size = 9) +theme(axis.text = element_text(colour = "black"), legend.position="top", strip.background = element_blank()))
+```
+
+```{r}
+#FAITHDIVERSITY
+faith_pd<- read_qza("faith_pd_vector.qza")
+faith_pd<-faith_pd$data %>% rename("V1" = "id", "V2" = "faith_value")
+```
+
+```{r}
+metadata<-
+metadata %>% 
+  left_join(faith_pd)
+head(metadata)
+```
+
+```{r}
+#FAITHDIVERSITYMORPH
+
+island_colormorph_faith <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= morph, y= faith_value, fill = morph)) + 
+  geom_boxplot () +
+  xlab("Morph") +
+  ylab("Faith's Phylogenetic Diversity") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("sienna3", "seashell2", "lightgoldenrod")) + theme_q2r() + My_Theme
+
+island_colormorph_faith
+```
+```{r}
+island_colormorphsex_faith <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos") %>%
+  ggplot(aes(x= morph, y= faith_value, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Naxos Morph") +
+  ylab("Faith's Phylogenetic Diversity") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_colormorphsex_faith
+```
+```{r}
+
+ios_faith_morphtable_orange <- ios_faith_morphtable %>% filter(morph =="w")
+ios_orange_faith <- ios_faith_morphtable_orange %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+ios_orange_faith
+
+```
+
+
+
+```{r}
+naxos_faith_morphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+kruskal.test(faith_value ~ morph, naxos_faith_morphtable)
+```
+```{r}
+andros_faith_morphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "andros")
+kruskal.test(faith_value ~ morph, andros_faith_morphtable)
+```
+```{r}
+ios_faith_morphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "ios")
+kruskal.test(faith_value ~ morph, ios_faith_morphtable)
+```
+```{r}
+ios_faith_morphtable_wilcox <- ios_faith_morphtable %>% wilcox_test(faith_value ~ morph, p.adjust.method = "bonferroni")
+ios_faith_morphtable_wilcox
+```
+
+```{r}
+#FAITHDIVERSITYSEX
+
+island_sex_faith <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= sex, y= faith_value, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Sex") +
+  ylab("Faith Diversity") +
+  facet_grid("island") +
+  theme_q2r() + theme_q2r() + My_Theme
+
+island_sex_faith
+```
+
+```{r}
+andros_faith_sextable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "andros")
+kruskal.test(faith_value ~ sex, andros_faith_sextable )
+```
+```{r}
+naxos_faith_sextable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+kruskal.test(faith_value ~ sex, naxos_faith_sextable)
+```
+
+```{r}
+ios_faith_sextable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "ios")
+kruskal.test(faith_value ~ sex, ios_faith_sextable)
+
+```
+```{r}
+ios_faith_sextable_wilcox <- ios_faith_sextable %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+ios_faith_sextable_wilcox
+```
+```{r}
+naxos_faith_sextable_wilcox <- naxos_faith_sextable %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+naxos_faith_sextable_wilcox
+
+```
+```{r}
+andros_faith_sextable_wilcox <- andros_faith_sextable %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+andros_faith_sextable_wilcox
+```
+
+
+
+```{r}
+#FAITHDIVERSITYISLAND 
+
+island_faith <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= "island", y= faith_value, fill = island)) + 
+  geom_boxplot () +
+  xlab("Island") +
+  ylab("Faith Diversity") +
+  theme_q2r() + My_Theme
+island_faith
+```
+
+```{r}
+gplots::venn(list(metadata=metadata$id, shannon=shannon$id))
+```
+```{r}
+metadata<-
+metadata %>% 
+  left_join(shannon)
+head(metadata)
+```
+
+
+
+```{r}
+island_sex_shannon <- metadata %>% dplyr::filter(island != "x") %>% filter(morph != "oy") %>% filter(morph != "wy") %>%
+  ggplot(aes(x=sex, y= shannon_entropy, fill = sex)) +
+  geom_boxplot () +
+  xlab("Sex") +
+  ylab("Shannon Diversity") +
+  facet_grid("island") +
+  ggtitle("Shannon Diversity per Sex") +
+  theme_q2r() + My_Theme
+island_sex_shannon
+```
+```{r}
+iossex <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "ios") %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni") #COMMENT/UNCOMMENT
+iossex
+
+naxossex <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos") %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni") #COMMENT/UNCOMMENT
+naxossex
+
+#androssex <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "andros") %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni") #COMMENT/UNCOMMENT
+androssex
+```
+```{r}
+naxossex
+```
+```{r}
+iossex
+```
+
+```{r}
+island_colormorph_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= morph, y= shannon_entropy, fill = morph)) + 
+  geom_boxplot () +
+  xlab("Morph") +
+  ylab("Shannon Diversity") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("sienna3", "seashell2", "lightgoldenrod")) + theme_q2r() + My_Theme
+
+island_colormorph_shannon
+```
+```{r}
+iosmorph <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "ios") %>% wilcox_test(shannon_entropy ~ morph, p.adjust.method = "bonferroni")
+iosmorph
+
+naxosmorph <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos") %>% wilcox_test(shannon_entropy ~ morph, p.adjust.method = "bonferroni")
+naxosmorph
+
+androsmorph <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "andros") %>% wilcox_test(shannon_entropy ~ morph, p.adjust.method = "bonferroni")
+androsmorph
+```
+
+
+```{r}
+naxosmorph
+```
+
+```{r}
+androsmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "andros")
+kruskal.test(shannon_entropy ~ morph, data = androsmorphtable)
+```
+```{r}
+kruskal.test(faith_value ~ morph, data = androsmorphtable)
+```
+```{r}
+kruskal.test(faith_value ~ morph, data = iosmorphtable)
+```
+```{r}
+naxosmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+kruskal.test(faith_value ~ morph, data = naxosmorphtable)
+```
+
+
+
+```{r}
+naxossmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+kruskal.test(shannon_entropy ~ morph, data = naxossmorphtable)
+```
+```{r}
+iosmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "ios")
+kruskal.test(shannon_entropy ~ morph, data = iosmorphtable)
+```
+
+```{r}
+library(FSA)
+dunn_andros_morph <- dunnTest(shannon_entropy ~ morph, androsmorphtable)
+dunn_andros_morph
+```
+```{r}
+w_andros_morph <-naxosmorphtable %>% pull(faith_value)
+andros_normality_W <- shapiro.test(w_andros_morph)
+andros_normality_W
+```
+```{r}
+
+```
+
+
+
+
+
+
+
+```{r}
+iosmorph
+```
+
+
+
+
+```{r}
+
+island_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= island, y= shannon_entropy, fill = island)) + 
+  geom_boxplot() +
+  xlab("Island") +
+  ylab("Shannon Diversity") + scale_fill_manual(values = c("cadetblue2", "darkseagreen", "#CC79A7")) + theme_q2r() + My_Theme
+island_shannon
+```
+```{r}
+island_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= island, y= faith_value, fill = island)) + 
+  geom_boxplot() +
+  xlab("Island") +
+  ylab("Faith's Phylogenetic Diversity") + scale_fill_manual(values = c("cadetblue2", "darkseagreen", "#CC79A7")) + theme_q2r() + My_Theme
+island_shannon
+```
+
+
+
+
+
+
+
+```{r}
+island_morphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+```
+
+```{r}
+#kruskalgroup
+kruskal.test(faith_value ~ island, data = island_morphtable)
+```
+```{r}
+kruskal.test(shannon_entropy ~ morph, data = metadata)
+```
+
+```{r}1
+#dunnpairwise
+pwc <- metadata %>% 
+  dunn_test(shannon_entropy ~ island, p.adjust.method = "bonferroni") 
+pwc
+```
+
+```{r}
+#effectsize
+metadata %>% kruskal_effsize(shannon_entropy ~ island)
+```
+
+```{r}
+island_colormorph_faith <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= morph, y= faith_value)) + 
+  geom_boxplot () +
+  xlab("Morph") +
+  ylab("Shannon Diversity") +
+  ggtitle("Shannon Diversity per Color Morph") +
+  theme_q2r() + scale_fill_manual(values = c("cadetblue2", "darkseagreen", "#CC79A7")) +  My_Theme
+
+island_colormorph_shannon
+
+```
+```{r}
+#iosmorph <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "ios") %>% wilcox_test(shannon_entropy ~ morph, p.adjust.method = "bonferroni") #COMMENT/UNCOMMENT
+iosmorph
+
+#naxosmorph <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos") %>% wilcox_test(shannon_entropy ~ morph, p.adjust.method = "bonferroni") #COMMENT/UNCOMMENT
+naxosmorph
+
+#androsmorph <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "andros") %>% wilcox_test(shannon_entropy ~ morph, p.adjust.method = "bonferroni") #COMMENT/UNCOMMENT
+androsmorph
+```
+```{r}
+naxosmorph
+```
+```{r}
+iosmorph
+```
+```{r
+```
+
+```{r}
+island_colormorph_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= morph, y= shannon_entropy, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Morph") +
+  ylab("Shannon Diversity") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_colormorph_shannon
+```
+```{r}
+island_colormorph_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos") %>%
+  ggplot(aes(x= morph, y= shannon_entropy, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Naxos Morph") +
+  ylab("Shannon Diversity") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_colormorph_shannon
+```
+
+
+
+
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+```{r}
+island_color_sex_morph_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= sex, y= shannon_entropy, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Sex") +
+  ylab("Shannon Diversity") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_color_sex_morph_shannon
+```
+
+```{r}
+island_color_sex_morph_shannon <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x") %>%
+  ggplot(aes(x= sex, y= faith_value, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Sex") +
+  ylab("Faith's Phylogenetic Diversity") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_color_sex_morph_shannon
+```
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+SVs<-read_qza("table2.qza")
+metadata<-read_tsv("metadata2.tsv")
+taxonomy<-read_qza("taxonomy2.qza")
+taxonomy<-parse_taxonomy(taxonomy$data)
+```
+```{r}
+#braycurtis pcoa
+
+library(dplyr)
+
+bray <- read_qza("braycurtis.qza")
+bray_curtis <- read_tsv("distance-matrix.tsv") #uncomment/comment RARIFIED 7000
+bray_curtis <- bray_curtis %>% rename("...1" = "id") #uncomment/comment
+metadata_pcoa <- inner_join(metadata, bray_curtis, by='id') #uncomment/comment
+
+```
+
+```{r}
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+metadata_pcoa <- metadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+pca1 <- PCA(metadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+metadata_pcoa$pc1 <- pca1$ind$coord[, 1]
+metadata_pcoa$pc2 <- pca1$ind$coord[, 2]
+pca.vars <- pca1$var$coord %>% data.frame
+pca.vars$vars <- rownames(pca.vars)
+pca.vars.m <- melt(pca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+bray_curtis_morph <- ggplot(data = metadata_pcoa, aes(x = pc1, y = pc2, color = morph)) + geom_point() + facet_grid("island") + scale_color_manual(values = c("sienna3", "seashell2", "lightgoldenrod"))
+
+bray_curtis_morph
+```
+```{r}
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+metadata_pcoa <- metadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+pca1 <- PCA(metadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+metadata_pcoa$pc1 <- pca1$ind$coord[, 1]
+metadata_pcoa$pc2 <- pca1$ind$coord[, 2]
+pca.vars <- pca1$var$coord %>% data.frame
+pca.vars$vars <- rownames(pca.vars)
+pca.vars.m <- melt(pca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+bray_curtis_sex <- ggplot(data = metadata_pcoa, aes(x = pc1, y = pc2, color = sex)) + geom_point() + facet_grid("island")
+
+bray_curtis_sex
+```
+
+```{r}
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+metadata_pcoa <- metadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+pca1 <- PCA(metadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+metadata_pcoa$pc1 <- pca1$ind$coord[, 1]
+metadata_pcoa$pc2 <- pca1$ind$coord[, 2]
+pca.vars <- pca1$var$coord %>% data.frame
+pca.vars$vars <- rownames(pca.vars)
+pca.vars.m <- melt(pca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+bray_curtis_island <- ggplot(data = metadata_pcoa, aes(x = pc1, y = pc2, color = island)) + geom_point()
+
+bray_curtis_island
+```
+```{r}
+library(dplyr)
+jaccard_pcoa <- read_tsv("jaccarddistance-matrix.tsv") #uncomment/comment RARIFIED 7000
+jaccard_pcoa <- jaccard_pcoa %>% rename("...1" = "id") #uncomment/comment
+jaccardmetadata_pcoa <- inner_join(metadata, jaccard_pcoa, by='id') #uncomment/comment
+
+```
+
+```{r}
+#JACCARDISLAND
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+jaccardmetadata_pcoa <- jaccardmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+jacpca1 <- PCA(jaccardmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+jaccardmetadata_pcoa$pc1 <- jacpca1$ind$coord[, 1]
+jaccardmetadata_pcoa$pc2 <- jacpca1$ind$coord[, 2]
+jacpca.vars <- jacpca1$var$coord %>% data.frame
+jacpca.vars$vars <- rownames(jacpca.vars)
+jacpca.vars.m <- melt(jacpca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+jaccard_island <- ggplot(data = jaccardmetadata_pcoa, aes(x = pc1, y = pc2, color = island)) + geom_point()
+jaccard_island
+```
+```{r}
+#JACCARDMORPH
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+jaccardmetadata_pcoa <- jaccardmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+jacpca1 <- PCA(jaccardmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+jaccardmetadata_pcoa$pc1 <- jacpca1$ind$coord[, 1]
+jaccardmetadata_pcoa$pc2 <- jacpca1$ind$coord[, 2]
+jacpca.vars <- jacpca1$var$coord %>% data.frame
+jacpca.vars$vars <- rownames(jacpca.vars)
+jacpca.vars.m <- melt(jacpca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+jaccard_morph <- ggplot(data = jaccardmetadata_pcoa, aes(x = pc1, y = pc2, color = morph)) + geom_point() + facet_grid("island") + scale_color_manual(values = c("sienna3", "seashell2", "lightgoldenrod"))
+
+jaccard_morph
+```
+```{r}
+#JACCARDSEX
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+jaccardmetadata_pcoa <- jaccardmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+jacpca1 <- PCA(jaccardmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+jaccardmetadata_pcoa$pc1 <- jacpca1$ind$coord[, 1]
+jaccardmetadata_pcoa$pc2 <- jacpca1$ind$coord[, 2]
+jacpca.vars <- jacpca1$var$coord %>% data.frame
+jacpca.vars$vars <- rownames(jacpca.vars)
+jacpca.vars.m <- melt(jacpca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+jaccard_sex <- ggplot(data = jaccardmetadata_pcoa, aes(x = pc1, y = pc2, color = sex)) + geom_point() + facet_grid("island")
+
+jaccard_sex
+```
+```{r}
+euclidean <- read_tsv("euclideandistance-matrix.tsv") #uncomment/comment RARIFIED 7000
+euclidean <- euclidean %>% rename("...1" = "id") #uncomment/comment
+euclideanmetadata_pcoa <- inner_join(metadata, euclidean, by='id') #uncomment/comment
+```
+
+```{r}
+#EUCLIDEANISLAND
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+euclideanmetadata_pcoa <- euclideanmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+eucpca1 <- PCA(euclideanmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+euclideanmetadata_pcoa$pc1 <- eucpca1$ind$coord[, 1]
+euclideanmetadata_pcoa$pc2 <- eucpca1$ind$coord[, 2]
+eucpca.vars <- eucpca1$var$coord %>% data.frame
+eucpca.vars$vars <- rownames(eucpca.vars)
+eucpca.vars.m <- melt(eucpca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+euclidean_island <- ggplot(data = euclideanmetadata_pcoa, aes(x = pc1, y = pc2, color = island)) + geom_point()
+euclidean_island
+```
+```{r}
+#EUCLIDEANMORPH
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+euclideanmetadata_pcoa <- euclideanmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+eucpca1 <- PCA(euclideanmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+euclideanmetadata_pcoa$pc1 <- eucpca1$ind$coord[, 1]
+euclideanmetadata_pcoa$pc2 <- eucpca1$ind$coord[, 2]
+eucpca.vars <- eucpca1$var$coord %>% data.frame
+eucpca.vars$vars <- rownames(eucpca.vars)
+eucpca.vars.m <- melt(eucpca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+euclidean_morph <- ggplot(data = euclideanmetadata_pcoa, aes(x = pc1, y = pc2, color = morph)) + geom_point() + facet_grid("island") + scale_color_manual(values = c("sienna3", "seashell2", "lightgoldenrod"))
+
+euclidean_morph
+```
+```{r}
+#EUCLIDEANSEX
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+euclideanmetadata_pcoa <- euclideanmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+eucpca1 <- PCA(euclideanmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+euclideanmetadata_pcoa$pc1 <- eucpca1$ind$coord[, 1]
+euclideanmetadata_pcoa$pc2 <- eucpca1$ind$coord[, 2]
+eucpca.vars <- eucpca1$var$coord %>% data.frame
+eucpca.vars$vars <- rownames(eucpca.vars)
+eucpca.vars.m <- melt(eucpca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+euclidean_sex <- ggplot(data = euclideanmetadata_pcoa, aes(x = pc1, y = pc2, color = sex)) + geom_point() + facet_grid("island")
+
+euclidean_sex
+```
+
+```{r}
+unifrac <- read_tsv("unweighted_unifrac_distance-matrix.tsv") #uncomment/comment RARIFIED 7000
+unifrac <- unifrac %>% rename("...1" = "id") #uncomment/comment
+unifracmetadata_pcoa <- inner_join(metadata, unifrac, by='id') #uncomment/comment
+```
+
+```{r}
+#UNIFRACSEX
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+unifracmetadata_pcoa <- unifracmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+unifracpca1 <- PCA(unifracmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+unifracmetadata_pcoa$pc1 <- unifracpca1$ind$coord[, 1]
+unifracmetadata_pcoa$pc2 <- unifracpca1$ind$coord[, 2]
+unifracca.vars <- unifracpca1$var$coord %>% data.frame
+unifracca.vars$vars <- rownames(unifracca.vars)
+unifracca.vars.m <- melt(unifracca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+unifrac_sex <- ggplot(data = unifracmetadata_pcoa, aes(x = pc1, y = pc2, color = sex)) + geom_point() + facet_grid("island")
+
+unifrac_sex
+```
+```{r}
+#UNIFRACMORPH
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+unifracmetadata_pcoa <- unifracmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+unifracpca1 <- PCA(unifracmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+unifracmetadata_pcoa$pc1 <- unifracpca1$ind$coord[, 1]
+unifracmetadata_pcoa$pc2 <- unifracpca1$ind$coord[, 2]
+unifracca.vars <- unifracpca1$var$coord %>% data.frame
+unifracca.vars$vars <- rownames(unifracca.vars)
+unifracca.vars.m <- melt(unifracca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+unifrac_morph <- ggplot(data = unifracmetadata_pcoa, aes(x = pc1, y = pc2, color = morph)) + geom_point() + facet_grid("island") + scale_color_manual(values = c("sienna3", "seashell2", "lightgoldenrod"))
+
+unifrac_morph
+```
+```{r}
+#UNIFRACISLAND
+require(FactoMineR)
+require(factoextra)
+require(ggplot2)
+require(tidyr)
+require(dplyr)
+require(MASS)
+require(reshape2)
+require(cowplot)
+unifracmetadata_pcoa <- unifracmetadata_pcoa %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+unifracpca1 <- PCA(unifracmetadata_pcoa, quali.sup = c(1:16), quanti.sup = c(17, 18), graph = FALSE)
+unifracmetadata_pcoa$pc1 <- unifracpca1$ind$coord[, 1]
+unifracmetadata_pcoa$pc2 <- unifracpca1$ind$coord[, 2]
+unifracca.vars <- unifracpca1$var$coord %>% data.frame
+unifracca.vars$vars <- rownames(unifracca.vars)
+unifracca.vars.m <- melt(unifracca.vars, id.vars = "vars")
+circleFun <- function(center = c(0,0),diameter = 1, npoints = 100) {
+  r = diameter / 2
+  tt <- seq(0,2*pi,length.out = npoints)
+  xx <- center[1] + r * cos(tt)
+  yy <- center[2] + r * sin(tt)
+  return(data.frame(x = xx, y = yy))
+}
+
+circ <- circleFun(c(0,0),2,npoints = 500)
+unifrac_island <- ggplot(data = unifracmetadata_pcoa, aes(x = pc1, y = pc2, color = island)) + geom_point()
+
+unifrac_island
+```
+
+```{r}
+TAX <- read_qza("taxonomy2.qza")
+OTU <- read_qza("16S-table-noplant-rarefied-7000_filtered2.qza")
+META <- read_tsv("metadata2.tsv")
+phy_tree <- read_qza("rooted-16S-tree-filteredSVs2.qza")
+#physeq <- phyloseq(OTU, TAX, META, phy_tree)
+```
+
+```{r}
+#library(ggvegan)
+
+library(vegan) 
+all_dist <- metadata_pcoa %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist ~ island, data = metadata_pcoa)
+```
+```{r}
+metadata_pcoa_ios <- metadata_pcoa %>% filter(island=="ios")
+all_dist_ios <- metadata_pcoa %>% filter(island=="ios") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_ios ~ morph, data = metadata_pcoa_ios)
+
+metadata_pcoa_ios <- metadata_pcoa %>% filter(island=="ios")
+all_dist_ios <- metadata_pcoa %>% filter(island=="ios") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_ios ~ sex, data = metadata_pcoa_ios)
+
+```
+```{r}
+metadata_pcoa_andros <- metadata_pcoa %>% filter(island=="andros") 
+all_dist_andros <- metadata_pcoa %>% filter(island=="andros") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_andros ~ morph, data = metadata_pcoa_andros)
+adonis2(all_dist_andros ~ sex, data = metadata_pcoa_andros)
+```
+```{r}
+metadata_pcoa_naxos <- metadata_pcoa %>% filter(island=="naxos")
+all_dist_naxos <- metadata_pcoa %>% filter(island=="naxos") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_naxos ~ morph, data = metadata_pcoa_naxos)
+adonis2(all_dist_naxos ~ sex, data = metadata_pcoa_naxos)
+
+```
+
+```{r}
+library(vegan) 
+all_dist_unifrac <- unifracmetadata_pcoa %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_unifrac ~ island, data = unifracmetadata_pcoa)
+```
+```{r}
+library(vegan) 
+unifracmetadata_pcoaios <- unifracmetadata_pcoa %>% filter(island=="ios")
+
+all_dist_unifrac_ios <- unifracmetadata_pcoa %>% filter(island=="ios") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_unifrac_ios ~ morph, data = unifracmetadata_pcoaios)
+adonis2(all_dist_unifrac_ios ~ sex, data = unifracmetadata_pcoaios)
+```
+```{r}
+unifracmetadata_pcoaandros <- unifracmetadata_pcoa %>% filter(island=="andros")
+
+all_dist_unifrac_andros <- unifracmetadata_pcoa %>% filter(island=="andros") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_unifrac_andros ~ morph, data = unifracmetadata_pcoaandros)
+adonis2(all_dist_unifrac_andros ~ sex, data = unifracmetadata_pcoaandros)
+```
+```{r}
+unifracmetadata_pcoanaxos <- unifracmetadata_pcoa %>% filter(island=="naxos")
+
+all_dist_unifrac_naxos <- unifracmetadata_pcoa %>% filter(island=="naxos") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_unifrac_naxos ~ morph, data = unifracmetadata_pcoanaxos)
+adonis2(all_dist_unifrac_naxos ~ sex, data = unifracmetadata_pcoanaxos)
+```
+
+
+
+
+
+```{r}
+library(vegan) 
+all_dist_euclidean <- euclideanmetadata_pcoa %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_euclidean ~ island, data = euclideanmetadata_pcoa)
+
+
+```
+```{r}
+library(vegan) 
+euclideanmetadata_pcoaios <- euclideanmetadata_pcoa %>% filter(island=="ios")
+
+all_dist_euclidean_ios <- euclideanmetadata_pcoa %>% filter(island=="ios") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+
+adonis2(all_dist_euclidean_ios ~ morph, data = euclideanmetadata_pcoaios)
+
+adonis2(all_dist_euclidean_ios ~ sex, data = euclideanmetadata_pcoaios)
+
+```
+```{r}
+euclideanmetadata_pcoaandros <- euclideanmetadata_pcoa %>% filter(island=="andros")
+
+all_dist_euclidean_andros <- euclideanmetadata_pcoa %>% filter(island=="andros") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+
+adonis2(all_dist_euclidean_andros ~ morph, data = euclideanmetadata_pcoaandros)
+
+adonis2(all_dist_euclidean_andros ~ sex, data = euclideanmetadata_pcoaandros)
+```
+```{r}
+euclideanmetadata_pcoanaxos <- euclideanmetadata_pcoa %>% filter(island=="naxos")
+
+all_dist_euclidean_naxos <- euclideanmetadata_pcoa %>% filter(island=="naxos") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+
+adonis2(all_dist_euclidean_naxos ~ morph, data = euclideanmetadata_pcoanaxos)
+
+adonis2(all_dist_euclidean_naxos ~ sex, data = euclideanmetadata_pcoanaxos)
+```
+
+
+```{r}
+library(vegan) 
+all_dist_jaccard <- jaccardmetadata_pcoa %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_jaccard ~ island, data = jaccardmetadata_pcoa)
+```
+
+```{r}
+library(vegan) 
+jaccardmetadata_pcoaios <- jaccardmetadata_pcoa %>% filter(island == "ios") 
+all_dist_jaccardios <- jaccardmetadata_pcoa %>% filter(island == "ios") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_jaccardios ~ morph, data = jaccardmetadata_pcoaios)
+
+adonis2(all_dist_jaccardios ~ sex, data = jaccardmetadata_pcoaios)
+```
+```{r}
+library(vegan) 
+jaccardmetadata_pcoaandros <- jaccardmetadata_pcoa %>% filter(island == "andros") 
+all_dist_jaccardandros <- jaccardmetadata_pcoa %>% filter(island == "andros") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_jaccardandros ~ morph, data = jaccardmetadata_pcoaandros)
+adonis2(all_dist_jaccardandros ~ sex, data = jaccardmetadata_pcoaandros)
+```
+```{r}
+library(vegan) 
+jaccardmetadata_pcoanaxos <- jaccardmetadata_pcoa %>% filter(island == "naxos") 
+all_dist_jaccardnaxos <- jaccardmetadata_pcoa %>% filter(island == "naxos") %>% dplyr::select(all_of(.[['id']])) %>% as.dist()
+adonis2(all_dist_jaccardnaxos ~ morph, data = jaccardmetadata_pcoanaxos)
+adonis2(all_dist_jaccardnaxos ~ sex, data = jaccardmetadata_pcoanaxos)
+```
+
+```{r}
+calc <- metadata %>% filter(island == "naxos") %>% filter(morph == "o") %>% filter(sex == "f")
+calc
+```
+```{r}
+naxosmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+naxosmorphtableorange <- naxosmorphtable %>% filter(morph == "o") %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableorange
+```
+
+```{r}
+naxosmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+naxosmorphtableyellow <- naxosmorphtable %>% filter(morph == "y") %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableyellow
+```
+```{r}
+naxosmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+naxosmorphtablewhite <- naxosmorphtable %>% filter(morph == "w") %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtablewhite
+```
+```{r}
+naxosmorphtable <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island == "naxos")
+naxosmorphtableorange <- naxosmorphtable %>% filter(morph == "y") %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableorange
+```
+```{r}
+naxosmorphtable_sex <- naxosmorphtable %>% wilcox_test(shannon_entropy ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtable_sex
+```
+
+```{r}
+androsmorphtable_sex <- androsmorphtable %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+androsmorphtable_sex
+```
+```{r}
+iossmorphtable_sex <- iosmorphtable %>% wilcox_test(faith_value ~ sex, p.adjust.method = "bonferroni")
+iossmorphtable_sex
+```
+
+```{r}
+copy_metadata <- metadata %>% filter(morph != "wy") %>% filter(morph != "yo") %>% filter(island != "x")
+```
+```{r}
+
+simpson<- read_qza("simpson7000.qza")
+simpson<-simpson$data 
+
+```
+```{r}
+library(tibble)
+simpson <- rownames_to_column(simpson, var="id")
+```
+
+```{r}
+copy_metadata<-
+copy_metadata %>% 
+  left_join(simpson)
+head(copy_metadata)
+```
+```{r}
+chao<- read_qza("chao7000.qza")
+chao<-chao$data 
+chao <- rownames_to_column(chao, var="id")
+```
+```{r}
+copy_metadata<-
+copy_metadata %>% 
+  left_join(chao)
+head(copy_metadata)
+```
+```{r}
+island_simpson <- copy_metadata %>%
+  ggplot(aes(x= island , y= simpson, fill = island)) + 
+  geom_boxplot () +
+  xlab("Island") +
+  ylab("Simpson’s Index") + scale_fill_manual(values = c("cadetblue2", "darkseagreen", "#CC79A7")) +
+  theme_q2r() + My_Theme
+island_simpson
+```
+```{r}
+kruskal.test(simpson ~ island, copy_metadata)
+
+```
+```{r}
+# dunn_simp_island <- dunnTest(simpson ~ island, copy_metadata)
+dunn_simp_island
+```
+```{r}
+kruskal.test(chao1 ~ island, copy_metadata)
+```
+
+
+
+
+
+```{r}
+island_chao <- copy_metadata %>%
+  ggplot(aes(x= island , y= chao1, fill = island)) + 
+  geom_boxplot () +
+  xlab("Island") +
+  ylab("Chao1 Index") + scale_fill_manual(values = c("cadetblue2", "darkseagreen", "#CC79A7")) +
+  theme_q2r() + My_Theme
+island_chao
+```
+```{r}
+island_sex_simp <- copy_metadata %>%
+  ggplot(aes(x= sex, y= simpson, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Sex") +
+  ylab("Simpson’s Index") + facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_sex_simp
+```
+```{r}
+ios_simp_sextable_wilcox <- copy_metadata %>% filter(island == "ios") %>% wilcox_test(simpson ~ sex, p.adjust.method = "bonferroni")
+ios_simp_sextable_wilcox
+```
+```{r}
+andros_simp_sextable_wilcox <- copy_metadata %>% filter(island == "andros") %>% wilcox_test(simpson ~ sex, p.adjust.method = "bonferroni")
+andros_simp_sextable_wilcox
+```
+```{r}
+naxos_simp_sextable_wilcox <- copy_metadata %>% filter(island == "naxos") %>% wilcox_test(simpson ~ sex, p.adjust.method = "bonferroni")
+naxos_simp_sextable_wilcox
+```
+
+
+
+
+
+
+```{r}
+island_sex_chao1 <- copy_metadata %>%
+  ggplot(aes(x= sex, y= chao1, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Sex") +
+  ylab("Chao1 Index") + facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_sex_chao1
+```
+```{r}
+naxos_chao_sextable_wilcox <- copy_metadata %>% filter(island == "naxos") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+naxos_chao_sextable_wilcox
+```
+```{r}
+andros_chao_sextable_wilcox <- copy_metadata %>% filter(island == "andros") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+andros_chao_sextable_wilcox
+```
+```{r}
+ios_chao_sextable_wilcox <- copy_metadata %>% filter(island == "ios") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+ios_chao_sextable_wilcox
+```
+```{r}
+naxos_chao_sextable_wilcox <- copy_metadata %>% filter(island == "naxos") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+naxos_chao_sextable_wilcox
+```
+```{r}
+island_colormorph_simp <- copy_metadata %>%
+  ggplot(aes(x= morph, y= simpson, fill = morph)) + 
+  geom_boxplot () +
+  xlab("Morph") +
+  ylab("Simpson's Index") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("sienna3", "seashell2", "lightgoldenrod")) + theme_q2r() + My_Theme
+
+island_colormorph_simp
+```
+```{r}
+naxos_simp_morphtable <- copy_metadata %>% filter(island == "naxos")
+kruskal.test(simpson ~ morph, naxos_simp_morphtable)
+```
+```{r}
+andros_simp_morphtable <- copy_metadata %>% filter(island == "andros")
+kruskal.test(simpson ~ morph, andros_simp_morphtable)
+```
+```{r}
+ios_simp_morphtable <- copy_metadata %>% filter(island == "ios")
+ios_simp_morph_wilcox <- ios_simp_morphtable %>% wilcox_test(simpson ~ morph, p.adjust.method = "bonferroni")
+ios_simp_morph_wilcox
+```
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+island_colormorphsex_simp <- copy_metadata %>% filter(island == "naxos") %>%
+  ggplot(aes(x= morph, y= simpson, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Naxos Morph") +
+  ylab("Simpson's Index") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_colormorphsex_simp 
+```
+```{r}
+naxosmorphtable_simp <- copy_metadata %>% filter(island == "naxos")
+naxosmorphtableorange_simp <- naxosmorphtable_simp %>% filter(morph == "o") %>% wilcox_test(simpson ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableorange_simp
+```
+```{r}
+naxosmorphtable_simp <- copy_metadata %>% filter(island == "naxos")
+naxosmorphtableyellow_simp <- naxosmorphtable_simp %>% filter(morph == "y") %>% wilcox_test(simpson ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableyellow_simp
+```
+```{r}
+naxosmorphtable_simp <- copy_metadata %>% filter(island == "naxos")
+naxosmorphtableyellow_simp <- naxosmorphtable_simp %>% filter(morph == "w") %>% wilcox_test(simpson ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableyellow_simp
+```
+```{r}
+island_colormorph_chao <- copy_metadata %>%
+  ggplot(aes(x= morph, y= chao1, fill = morph)) + 
+  geom_boxplot () +
+  xlab("Morph") +
+  ylab("Chao1 Index") +
+  facet_grid("island") +
+  theme_q2r() + scale_fill_manual(values = c("sienna3", "seashell2", "lightgoldenrod")) + theme_q2r() + My_Theme
+
+island_colormorph_chao
+```
+```{r}
+naxos_chao_morphtable <- copy_metadata %>% filter(island == "naxos")
+kruskal.test(chao1 ~ morph, naxos_chao_morphtable)
+```
+```{r}
+andros_chao_morphtable <- copy_metadata %>% filter(island == "andros")
+kruskal.test(chao1 ~ morph, andros_chao_morphtable)
+```
+
+```{r}
+ios_chao_morphtable <- copy_metadata %>% filter(island == "ios")
+ios_chao_morph_wilcox <- ios_chao_morphtable %>% wilcox_test(chao1 ~ morph, p.adjust.method = "bonferroni")
+ios_chao_morph_wilcox
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+island_colormorphsex_chao <- copy_metadata %>% filter(island == "naxos") %>%
+  ggplot(aes(x= morph, y= chao1, fill = sex)) + 
+  geom_boxplot () +
+  xlab("Naxos Morph") +
+  ylab("Chao1 Index") +
+  theme_q2r() + scale_fill_manual(values = c("mediumorchid3", "mediumaquamarine")) + theme_q2r() + My_Theme
+
+island_colormorphsex_chao
+```
+```{r}
+naxosmorphtable_chao <- copy_metadata %>% filter(island == "naxos")
+naxosmorphtableorange_chao <- naxosmorphtable_chao %>% filter(morph == "o") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableorange_chao
+```
+
+```{r}
+naxosmorphtable_chao <- copy_metadata %>% filter(island == "naxos")
+naxosmorphtablewhite_chao <- naxosmorphtable_chao %>% filter(morph == "w") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtablewhite_chao
+```
+
+```{r}
+naxosmorphtable_chao <- copy_metadata %>% filter(island == "naxos")
+naxosmorphtableyellow_chao <- naxosmorphtable_chao %>% filter(morph == "y") %>% wilcox_test(chao1 ~ sex, p.adjust.method = "bonferroni")
+naxosmorphtableyellow_chao
+```
+
+```{r}
+library("phyloseq"); packageVersion("phyloseq")
+theme_set(theme_bw())
+
+```
+
+```{r}
+TAX <- read_qza("taxonomy2.qza")
+OTU <- read_qza("table2.qza")
+hi <- str_split_fixed(TAX[["data"]][["Taxon"]], '; ', 6)
+rownames(hi) <- rownames(OTU[["data"]])
+colnames(hi) <- c("Domain", "Phylum", "Class", "Order", "Family", "Genus")
+library("phyloseq")
+otu <- otu_table(data.frame(OTU[["data"]]), taxa_are_rows = TRUE)
+tax <- tax_table(hi)
+physeq <- phyloseq(otu, tax)
+dev.new(width=10, height=5, unit="cm")
+
+#plot_bar(physeq, fill='Class')
+#ggplotly(hi)
+
+```
+
+```{r}
+pacman::p_load(tidyverse, plotly, randomcoloR)
+otu_table <- data.frame(OTU[["data"]])
+otu_table$taxonomy <- TAX[["data"]][["Taxon"]]
+otu_table <- cbind(Feature.ID = rownames(otu_table), otu_table)
+rownames(otu_table) <- 1:nrow(otu_table)
+
+metadata_hi <- metadata
+
+metadata_hi <- dplyr::rename(metadata_hi, "sample_id" = "id")
+
+metadata_2 <- read_csv("https://raw.githubusercontent.com/CaitlinCasar/Casar2020_DeMMO_MineralHostedBiofilms/master/orig_data/metadata.csv") 
+
+otu_table_2 <- read_delim("https://raw.githubusercontent.com/CaitlinCasar/Casar2020_DeMMO_MineralHostedBiofilms/master/orig_data/DeMMO136_Dec2015toApril2018_noChimera_otuTable_withTaxa_d10000.txt", delim="\t", comment = "# ")
+#metadata <- read_csv("https://raw.githubusercontent.com/CaitlinCasar/Casar2020_DeMMO_MineralHostedBiofilms/master/orig_data/metadata.csv")
+
+taxonomy <- otu_table %>%
+  select(`Feature.ID`, taxonomy) %>%
+  mutate(tax = taxonomy, taxonomy = str_remove_all(tax, "d__| p__| c__| o__| f__| g__| s__")) %>%
+  separate(taxonomy, sep=';', c("domain", "phylum", "class", "order", "family", "genus", "species")) %>%
+  gather(level, taxonomy, domain:species)
+
+taxonomy_2 <- otu_table_2 %>%
+  select(`#OTU ID`, taxonomy) %>%
+  mutate(tax = gsub("Gammaproteobacteria; D_3__Betaproteobacteriales", "Betaproteobacteria; D_3__Betaproteobacteriales", taxonomy), #fix taxonomy for Beta's,
+         taxonomy = str_remove_all(tax, "D_0__| D_1__| D_2__| D_3__| D_4__| D_5__| D_6__")) %>%
+  separate(taxonomy ,sep=';',c("domain", "phylum", "class", "order", "family", "genus", "species")) %>%
+  gather(level, taxonomy, domain:species)
+
+abundance_table <- otu_table %>%
+  select(-taxonomy) %>%
+  mutate_at(vars(-`Feature.ID`), funs(./sum(.)*100)) %>% #normalize to relative abundance 
+  gather(sample_id, abundance, `AA1_Pe`:`Undetermined`) 
+
+abundance_table_2 <- otu_table_2 %>%
+  select(-taxonomy) %>%
+  mutate_at(vars(-`#OTU ID`), funs(./sum(.)*100)) %>% #normalize to relative abundance 
+  gather(sample_id, abundance, `7.DeMMO1.Steri.050917`:`18.800.DitchFluid.041818`) 
+
+barplot_samples <- colnames(otu_table)[2:76]
+
+barplot_samples_2 <- c("12.DeMMO1.steri.041818", 
+                     "26.DeMMO1.SC1.top.041818", 
+                     "22.DeMMO1.C.top.041818",
+                     "23.DeMMO1.D.top.041818", 
+                     "24.DeMMO1.E.top.041818",
+                     "27.DeMMO1.SC2.top.041818", 
+                     "34.DeMMO1.SC10.top.041818", 
+                     "45.DeMMO1.7.top.041818",
+                     "46.DeMMO1.8.top.041818", 
+                     "47.DeMMO1.9.top.041818",
+                     "14.DeMMO3.steri.041718", 
+                     "51.DeMMO3.A.top.041718",
+                     "27.DeMMO3.T8.top.051117", 
+                     "53.DeMMO3.C.top.041718", 
+                     "54.DeMMO3.D.top.041718",
+                     "55.DeMMO3.E.top.041718", 
+                     "39.DeMMO3.1.top.041718", 
+                     "40.DeMMO3.2.top.041718",
+                     "41.DeMMO3.3.top.041718", 
+                     "56.DeMMO3.F.top.041718",
+                     "12.DeMMO6.Steri#2.051017", 
+                     "13.DeMMO6.T1.top.051017",
+                     "15.DeMMO6.T2.top.051017", 
+                     "17.DeMMO6.T3.top.051017",
+                     "19.DeMMO6.T4.top.051017",
+                     "21.DeMMO6.T5.top.051017", 
+                     "24.DeMMO6.T6.bottom.051017") 
+
+taxon_abundance_table <- abundance_table %>%
+  left_join(taxonomy) %>%
+  filter(sample_id %in% barplot_samples & level == "phylum") %>%
+  mutate(taxonomy = if_else(is.na(taxonomy), "Unassigned", taxonomy))
+
+taxon_abundance_table_2 <- abundance_table_2 %>%
+  left_join(taxonomy_2) %>%
+  filter(sample_id %in% barplot_samples_2 & level == "phylum") %>%
+  mutate(taxonomy = if_else(is.na(taxonomy), "Unassigned", taxonomy))
+
+bar_plot <- taxon_abundance_table %>%
+  left_join(metadata_hi) %>%
+group_by(taxonomy, Feature.ID) %>%
+summarise(abundance = sum(abundance)) %>%
+  ungroup() %>% 
+  ggplot(aes(fill=taxonomy, y=abundance, x=Feature.ID)) +
+  geom_bar(stat='identity', position='fill')
+
+bar_plot_2 <- taxon_abundance_table_2 %>%
+  left_join(metadata_2) %>%
+  group_by(site, experiment.type, taxonomy) %>%
+summarise(abundance = sum(abundance)) %>%
+  ungroup() %>% 
+  ggplot(aes(fill=taxonomy, y=abundance, x=experiment.type)) +
+  geom_bar(stat='identity', position='fill')
+  
+ggplotly(bar_plot)
+
+```
+
